@@ -622,6 +622,9 @@ type Unmarshaler struct {
 	// fully-qualified type name from the type URL and pass that to
 	// proto.MessageType(string).
 	AnyResolver AnyResolver
+
+	// Whether to allow numbers 1|0 to coerce to true|false
+	CoerceNumberToBool bool
 }
 
 // UnmarshalNext unmarshals the next protocol buffer from a JSON object stream.
@@ -1009,6 +1012,21 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue json.RawMe
 	isNum := targetType.Kind() == reflect.Int64 || targetType.Kind() == reflect.Uint64
 	if isNum && strings.HasPrefix(string(inputValue), `"`) {
 		inputValue = inputValue[1 : len(inputValue)-1]
+	}
+
+	// coerce support converting 1|0 into true|false
+	if u.CoerceNumberToBool {
+		isBool := targetType.Kind() == reflect.Bool
+		if isBool {
+			switch string(inputValue) {
+			case "0":
+				target.SetBool(false)
+				return nil
+			case "1":
+				target.SetBool(true)
+				return nil
+			}
+		}
 	}
 
 	// Non-finite numbers can be encoded as strings.
